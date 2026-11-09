@@ -19,17 +19,18 @@ import serial
 
 # comunication configuration
 WIDTH, HEIGHT = 600, 600
-SERIAL_PORT = "/dev/pts/2"
+SERIAL_PORT = "/dev/pts/3"
 BAUD_RATE = 9600
 
 # thread configuration
 shared_state = {
     "algorithm": "VOR",
-    "points": []
+    "points": [],
 }
 data_lock = threading.Lock()
 running = True
-LDR_THRESHOLD = 50 # considered on
+LDR_THRESHOLD = 500 # considered on
+
 
 # serial listener: drains the serial buffer and stores the last received frame
 def serial_listener():
