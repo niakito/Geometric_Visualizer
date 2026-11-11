@@ -10,12 +10,12 @@ import serial
 import numpy as np
 
 # comunication configuration
-SERIAL_PORT = "/dev/pts/4"
+SERIAL_PORT = "/dev/pts/1"
 BAUD_RATE = 9600
 
 WIDTH, HEIGHT = 600, 600
 MARGIN = 40
-NUM_POINTS = 5
+NUM_POINTS = 8
 FPS = 30
 DT = 1.0 / FPS
 SEND_INTERVAL = 0.05

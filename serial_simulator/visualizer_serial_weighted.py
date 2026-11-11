@@ -19,7 +19,7 @@ import serial
 
 # comunication configuration
 WIDTH, HEIGHT = 600, 600
-SERIAL_PORT = "/dev/pts/3"
+SERIAL_PORT = "/dev/pts/4"
 BAUD_RATE = 9600
 
 # thread configuration
