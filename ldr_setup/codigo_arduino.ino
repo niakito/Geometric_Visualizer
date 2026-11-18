@@ -20,12 +20,12 @@ int weight[5] = {0, 0, 0, 0, 0} ;
 // LDR reading 
 const float GAMMA = 0.65 ; //  GL55XX (2~4 row)
 
-float R_min = 1000000.0 ;  // res. en max. luz 
-float R_max = 0.0       ;  // res. en max. sombra 
+float R_min[5]     = {1000000.0, 1000000.0, 1000000.0, 1000000.0, 1000000.0} ;
+float R_max[5]     = {0.0, 0.0, 0.0, 0.0, 0.0} ;
 
-float lux_min = 0.0 ;
-float lux_max = 1.0 ;
-float lux_range = 1.0 ; 
+float lux_min[5]   = {0.0, 0.0, 0.0, 0.0, 0.0} ;
+float lux_max[5]   = {1.0, 1.0, 1.0, 1.0, 1.0} ;
+float lux_range[5] = {1.0, 1.0, 1.0, 1.0, 1.0} ;
 
 // algorithm selection
 const String ALG[3] = {
@@ -58,36 +58,52 @@ void setup()
   // calibración de la resistencia del LDR
   lcd_1.print("Calibrando...") ;
   
-  while (millis() < 4000) {
-    for (int i = 0 ; i < 5 ; i++ ) {
-      int value = analogRead(LDR[i]) ;
-      float r_ratio = get_R_ratio(value) ;
+  while (millis() < 6000) {
+    for ( int i = 0 ; i < 5 ; i++ ) {
 
-      if (r_ratio < R_min) R_min = r_ratio ; // luz → menor resistencia
-      if (r_ratio > R_max) R_max = r_ratio ; // sombra → mayor resistencia
+      // obtener un máximo y mínimo promedio para cada LDR
+      long suma_adc = 0 ; 
+      for ( int j = 0 ; j < 4 ; j++ ) {
+        suma_adc += analogRead(LDR[i]) ;
+      }
+      
+      int adc_filtrado = suma_adc / 4 ;
+      float r_ratio = get_R_ratio(adc_filtrado) ;
+
+      if (r_ratio < R_min[i]) R_min[i] = r_ratio ; // luz → menor resistencia
+      if (r_ratio > R_max[i]) R_max[i] = r_ratio ; // sombra → mayor resistencia
   	}
   }
   
-  // valores por defecto
-  if (R_min >= R_max) {
-    R_min = get_R_ratio(969)  ; 
-    R_max = get_R_ratio(49) ; 
+  // precomputo
+  for ( int i = 0 ; i < 5 ; i++ ) {
+    // valores por defecto
+    if (R_min[i] >= R_max[i]) {
+      R_min[i] = get_R_ratio(969) ; 
+      R_max[i] = get_R_ratio(49)  ; 
+    }
+
+    lux_min[i]   = pow(R_max[i], -1.0 / GAMMA) ; // luz en sombra
+    lux_max[i]   = pow(R_min[i], -1.0 / GAMMA) ; // luz en luz
+
+    // margen del 5%
+    /* float margen = (lux_max[i] - lux_min[i]) * 0.05 ;
+    lux_min[i]  += margen ;
+    lux_max[i]  -= margen ; */
+    
+    lux_range[i] = lux_max[i] - lux_min[i] ; 
   }
 
-  lux_min = pow(R_max, -1.0 / GAMMA) ; // luz en sombra
-  lux_max = pow(R_min, -1.0 / GAMMA) ; // luz en luz
-  lux_range = lux_max - lux_min ; 
-  
   // printear en el lcd los resultados de la calibración
   lcd_1.clear() ;
   
   lcd_1.setCursor(0, 0) ;
   lcd_1.print("R_min: ") ;
-  lcd_1.print(R_min) ;
+  lcd_1.print(R_min[0]) ;
   
   lcd_1.setCursor(0, 1) ;
   lcd_1.print("R_max: ") ;
-  lcd_1.print(R_max) ;
+  lcd_1.print(R_max[0]) ;
    
   unsigned long tiempo_inicio = millis();
   while (millis() - tiempo_inicio < 3000) {}
@@ -121,12 +137,12 @@ void loop()
       int raw = analogRead(LDR[i]) ;
       
       float R_curr = get_R_ratio(raw) ;
-      R_curr = constrain(R_curr, R_min, R_max) ;
+      R_curr = constrain(R_curr, R_min[i], R_max[i]) ;
       
-      float lux_actual = pow(R_curr, -1.0 / GAMMA) ;
+      float lux_curr = pow(R_curr, -1.0 / GAMMA) ;
 
       // normalización lineal → 0.0 = sombra ; 1.0 = luz
-      float lineal_light = (lux_actual - lux_min) / lux_range ; // %luz/rango_luz
+      float lineal_light = (lux_curr - lux_min[i]) / lux_range[i] ; // %luz/rango_luz
       lineal_light = constrain(lineal_light, 0.0, 1.0) ;
       int light = (int)(lineal_light * 1023.0) ;
     

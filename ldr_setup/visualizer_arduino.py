@@ -24,7 +24,7 @@ shared_state = {
 }
 data_lock = threading.Lock()
 running = True
-LDR_THRESHOLD = 300 # considered on
+LDR_THRESHOLD = 300 # considered on (convex hull)
 
 
 # serial listener: drains the serial buffer and stores the last received frame
@@ -107,8 +107,15 @@ def triangulation_coloring(points, display):
     
     # extract vertex as [(x, y), ...]
     hull_pts = [tuple(p[0]) for p in hull]
+    hull_set = set(hull_pts)
     n = len(hull_pts)
 
+    # draw inside points
+    for p in points:
+        pt = (p[0], p[1])
+        if pt not in hull_set:
+            cv.circle(display, pt, radius=5, color=(180, 180, 180), thickness=-1)
+    
     if n < 3: # shouldnt b happenin..
         return
 
@@ -202,22 +209,23 @@ def main():
 
         # create canvas to display the results
         canvas = np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8)
-        alg_tag = "Stang-By (_ _*) Z z z"
-
-        # active points filtering
-        pts = [
-                 (pt[0], pt[1]) for pt in raw_pts if pt[2] >= LDR_THRESHOLD
-              ]
+        alg_tag = "Stand-By (_ _*) Z z z"
 
         if alg == "STANDBY":
             alg_tag = "Stand-By (_ _*) Z z z"
 
-        elif len(pts) >= 3:
+        else:
             if alg in ("3CH", "Convex Hull"):
                 active_pts = [pt for pt in raw_pts if pt[2] >= LDR_THRESHOLD]
-                triangulation_coloring(active_pts, canvas)
-                alg_tag = "Convex Hull & 3-Colored Fan Triangulation"
-
+                if len(active_pts) >= 3:
+                    triangulation_coloring(active_pts, canvas)
+                    alg_tag = "3-Colored Convex Hull"
+                else:
+                    # draw active points even tho they were insuff.
+                    for pt in active_pts:
+                        cv.circle(canvas, (pt[0], pt[1]), radius=5, color=point_color, thickness=-1)
+                    cv.putText(canvas, "Insufficient active points", (20, 65),
+                            cv.FONT_HERSHEY_SIMPLEX, 0.55, (190, 170, 225), 1, cv.LINE_AA)
             else:
                 # coordinates grid to calculate distance
                 grid_x, grid_y = np.meshgrid(np.arange(WIDTH), np.arange(HEIGHT))
@@ -234,7 +242,7 @@ def main():
                     # pixel color → winner seed
                     palette = np.array([get_deterministic_color(s) for s in seeds], dtype=np.uint8)
                     canvas = palette[region_map]
-                    alg_tag = "Weigthed Voronoi Tesellation"
+                    alg_tag = "Weigthed Voronoi Tessellation"
 
                 elif alg in ("DEL", "Delaunay"):
                     # laguerre dual
@@ -246,32 +254,32 @@ def main():
                         cv.line(canvas, p1, p2, (130, 230, 210), 2, cv.LINE_AA)
                     alg_tag = "Weighted Delaunay Triangulation"
 
+        # filtering 4 the window display
+        active_pts = [pt for pt in raw_pts if pt[2] >= LDR_THRESHOLD]
+        inactive_pts = [pt for pt in raw_pts if pt[2] < LDR_THRESHOLD]
+        pts = len(active_pts)
+
+        # draw inactive points
+        for pt in inactive_pts:
+            center = (int(pt[0]), int(pt[1]))
+            cv.circle(canvas, center, radius=4, color=(90, 90, 90), thickness=-1)
+
+        # draw active points :D
+        # 3CH has its own coloring method
         if alg not in ("3CH", "Convex Hull"): 
+            pts = len(raw_pts)
             # draw the set of points on the canvas
             for pt in raw_pts:
                 center = (int(pt[0]), int(pt[1]))
                 weight = pt[2]
-                is_active = weight >= LDR_THRESHOLD
-
                 weighted_radius = int(np.interp(weight, [0, 1023], [5, 150]))
                 
-                if is_active:
-                    cv.circle(canvas, center, radius=5, color=point_color, thickness=-1) # -1 fill
-                    cv.circle(canvas, center, radius=weighted_radius, color=(200, 200, 200), thickness=1) #  1 outline
+                cv.circle(canvas, center, radius=5, color=point_color, thickness=-1) # -1 fill
+                cv.circle(canvas, center, radius=weighted_radius, color=(200, 200, 200), thickness=1) #  1 outline
 
-                else:
-                    cv.circle(canvas, center, radius=5, color=(150, 150, 150), thickness=-1) # -1 fill
-                    cv.circle(canvas, center, radius=6, color=(90, 90, 90), thickness=1) #  1 outline
-
-        # 3CH has its own coloring method
-        else:       
-            for pt in raw_pts:
-                if pt[2] < LDR_THRESHOLD:
-                    center = (int(pt[0]), int(pt[1]))
-                    cv.circle(canvas, center, radius=4, color=(90, 90, 90), thickness=-1)
 
         # windows display
-        cv.putText(canvas, f"Algorithm: {alg_tag} | Active Points: {len(pts)}", (20, 35),
+        cv.putText(canvas, f"Algorithm: {alg_tag} | Active Points: {pts}", (20, 35),
                    cv.FONT_HERSHEY_SIMPLEX, 0.6, (230, 230, 230), 1, cv.LINE_AA)
 
         cv.imshow("Serial Visualizer", canvas)
